@@ -382,7 +382,10 @@ def main():
     img = build(data, date_str)
 
     pdf_path = OUT / f"fechamento_{stamp}.pdf"
-    img.save(str(pdf_path), resolution=300.0)
+    png_path = OUT / f"fechamento_{stamp}.png"
+    img.save(str(png_path), format="PNG")
+    img_rgb = Image.open(str(png_path)).convert("RGB")
+    img_rgb.save(str(pdf_path), "PDF", resolution=300.0)
     print(f"✓ PDF → {pdf_path}")
 
 
