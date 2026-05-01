@@ -146,13 +146,24 @@ def ytd_chg(ticker):
         return 0.0
 
 def di_acumulado():
-    """DI acumulado proxy via ^IRX (13W T-bill) — substitua por fonte BR se disponível."""
     try:
-        last, _, _ = fetch("^IRX")
-        if last:
-            return f"{last:.2f}%".replace(".", ",")
-        return "—"
-    except:
+        import urllib.request, json
+        from datetime import date
+        inicio = f"01/01/{date.today().year}"
+        fim    = date.today().strftime("%d/%m/%Y")
+        url    = (
+            f"https://api.bcb.gov.br/dados/serie/bcdata.sgs.11/dados"
+            f"?formato=json&dataInicial={inicio}&dataFinal={fim}"
+        )
+        with urllib.request.urlopen(url, timeout=10) as r:
+            dados = json.loads(r.read())
+        fator = 1.0
+        for d in dados:
+            fator *= (1 + float(d["valor"]) / 100)
+        acum = (fator - 1) * 100
+        return f"{acum:.2f}%".replace(".", ",")
+    except Exception as e:
+        print(f"WARN DI BCB: {e}")
         return "—"
 
 # ─────────────────────────────────────────────────────────────
