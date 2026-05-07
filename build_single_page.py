@@ -323,7 +323,6 @@ def build(data, date_str):
         ("Ibovespa",    safe_chg(data,"ibov"),   safe_val(data,"ibov")),
         ("SMAL11",      safe_chg(data,"smal11"),  safe_val(data,"smal11")),
         ("FIIs XFIX11", safe_chg(data,"xfix11"),  safe_val(data,"xfix11")),
-        ("IFIX",        safe_chg(data,"ifix"),    safe_val(data,"ifix")),
     ]
     indices_us = [
         ("S&P 500",   safe_chg(data,"sp500"),  safe_val(data,"sp500")),
