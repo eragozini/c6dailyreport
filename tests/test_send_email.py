@@ -2,7 +2,16 @@ from datetime import date
 
 import pytest
 
-from send_email import build_message, report_date_from_path
+from send_email import build_message, recipient_list, report_date_from_path
+
+
+def test_recipient_list_combines_trims_and_deduplicates() -> None:
+    recipients = recipient_list(
+        "principal@example.com, DUPLICADO@example.com",
+        " extra@example.com,duplicado@example.com ",
+    )
+
+    assert recipients == ["principal@example.com", "DUPLICADO@example.com", "extra@example.com"]
 
 
 def test_report_date_is_read_from_exact_filename(tmp_path) -> None:

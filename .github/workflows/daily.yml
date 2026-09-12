@@ -2,12 +2,19 @@ name: C6 Daily Market Close
 
 on:
   schedule:
-    - cron: '17 19 * * 1-5'
+    - cron: '30 18 * * 1-5'
       timezone: America/Sao_Paulo
   workflow_dispatch:
+    inputs:
+      force_send:
+        description: Ignorar a trava de entrega do dia
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: daily-market-close
@@ -19,10 +26,32 @@ jobs:
     timeout-minutes: 20
 
     steps:
+      - name: Verificar se o relatório do dia já foi entregue
+        id: delivery
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_SEND: ${{ inputs.force_send || 'false' }}
+        shell: bash
+        run: |
+          report_date="$(TZ=America/Sao_Paulo date +%F)"
+          marker="delivery-${report_date}"
+          delivered="$(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${marker}&per_page=1" --jq '.total_count')"
+          echo "report_date=${report_date}" >> "${GITHUB_OUTPUT}"
+          if [[ "${FORCE_SEND}" == "true" ]]; then
+            echo "already_sent=false" >> "${GITHUB_OUTPUT}"
+          elif [[ "${delivered}" -gt 0 ]]; then
+            echo "already_sent=true" >> "${GITHUB_OUTPUT}"
+            echo "Relatório de ${report_date} já foi entregue; encerrando sem duplicar o e-mail."
+          else
+            echo "already_sent=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Checkout
+        if: steps.delivery.outputs.already_sent != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python
+        if: steps.delivery.outputs.already_sent != 'true'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
@@ -30,12 +59,15 @@ jobs:
           cache-dependency-path: requirements.lock
 
       - name: Instalar dependências
+        if: steps.delivery.outputs.already_sent != 'true'
         run: python -m pip install --disable-pip-version-check --require-hashes -r requirements.lock
 
       - name: Testar cálculos e renderização
+        if: steps.delivery.outputs.already_sent != 'true'
         run: python -m pytest -q
 
       - name: Gerar PDF
+        if: steps.delivery.outputs.already_sent != 'true'
         id: build
         run: python build_single_page.py --skip-stale
 
@@ -59,8 +91,24 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           SMTP_TO:   ${{ secrets.SMTP_TO }}
+          SMTP_EXTRA_TO: ${{ vars.SMTP_EXTRA_TO }}
           SMTP_SECURITY: ${{ vars.SMTP_SECURITY || 'starttls' }}
         run: >-
           python send_email.py
           --pdf "${{ steps.build.outputs.pdf_path }}"
           --report-date "${{ steps.build.outputs.report_date }}"
+
+      - name: Registrar entrega para impedir duplicidade
+        if: steps.build.outputs.should_send == 'true'
+        shell: bash
+        run: |
+          printf 'run=%s\nsent_at=%s\n' "${GITHUB_RUN_ID}" "$(date -u +%FT%TZ)" > out/delivery-marker.txt
+
+      - name: Publicar marcador de entrega
+        if: steps.build.outputs.should_send == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: delivery-${{ steps.build.outputs.report_date }}
+          path: out/delivery-marker.txt
+          if-no-files-found: error
+          retention-days: 14

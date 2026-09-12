@@ -35,13 +35,17 @@ O JSON é a trilha de auditoria indicada para investigar divergências sem extra
 
 ## Automação e e-mail
 
-O workflow diário roda às 19:17 em `America/Sao_Paulo`, de segunda a sexta. Se o Ibovespa ainda não tiver fechamento da data corrente, o envio é ignorado para evitar relatório antigo com data nova ou duplicidade em feriados.
+O workflow diário roda às 18:30 em `America/Sao_Paulo`, de segunda a sexta. Um disparo externo por `workflow_dispatch` pode ser usado no mesmo horário para evitar a fila imprevisível dos crons do GitHub. Um marcador de entrega por data e a trava de concorrência garantem que os dois gatilhos não enviem e-mails duplicados.
+
+Se o Ibovespa ainda não tiver fechamento da data corrente, o envio é ignorado para evitar relatório antigo com data nova. Um disparo manual pode usar a opção `force_send` apenas quando for realmente necessário repetir o e-mail do dia.
 
 Configure os secrets:
 
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_TO` (lista separada por vírgulas).
 
 Opcionalmente, configure a variável `SMTP_SECURITY` como `starttls` (padrão), `ssl` ou `none`, e os ambientes locais `SMTP_FROM` e `SMTP_TIMEOUT`.
+
+Destinatários adicionais podem ser configurados na variável de repositório `SMTP_EXTRA_TO`, também como lista separada por vírgulas. Eles são combinados com `SMTP_TO`, removendo duplicados sem expor ou sobrescrever o secret principal.
 
 Para envio manual:
 
