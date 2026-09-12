@@ -21,6 +21,17 @@ def required_env(name: str) -> str:
     return value
 
 
+def recipient_list(*groups: str) -> list[str]:
+    """Combina listas separadas por vírgula, removendo vazios e duplicados."""
+    recipients: dict[str, str] = {}
+    for group in groups:
+        for raw_address in group.split(","):
+            address = raw_address.strip()
+            if address:
+                recipients.setdefault(address.casefold(), address)
+    return list(recipients.values())
+
+
 def report_date_from_path(path: Path) -> date:
     match = re.fullmatch(r"fechamento_(\d{8})\.pdf", path.name)
     if not match:
@@ -86,7 +97,7 @@ def main() -> int:
     if not pdf_path.is_file() or pdf_path.suffix.lower() != ".pdf":
         raise FileNotFoundError(f"PDF não encontrado: {pdf_path}")
 
-    recipients = [address.strip() for address in required_env("SMTP_TO").split(",") if address.strip()]
+    recipients = recipient_list(required_env("SMTP_TO"), os.getenv("SMTP_EXTRA_TO", ""))
     if not recipients:
         raise RuntimeError("SMTP_TO não contém destinatários válidos")
     sender = os.getenv("SMTP_FROM", required_env("SMTP_USER")).strip()
